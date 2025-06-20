@@ -6,6 +6,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const location = searchParams.get('location');
   const category = searchParams.get('category');
+  const lat = parseFloat(searchParams.get('lat') || 'NaN');
+  const lng = parseFloat(searchParams.get('lng') || 'NaN');
   const page = parseInt(searchParams.get('page') || '1', 10);
   const limit = parseInt(searchParams.get('limit') || '20', 10);
 
@@ -36,11 +38,31 @@ export async function GET(req: Request) {
 
     const total = await servicesCol.countDocuments(query);
 
-    const services = await servicesCol
-      .find(query)
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .toArray();
+    let services: any[];
+
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      services = await servicesCol
+        .aggregate([
+          {
+            $geoNear: {
+              near: { type: 'Point', coordinates: [lng, lat] },
+              distanceField: 'distance',
+              spherical: true,
+              distanceMultiplier: 0.001,
+              query,
+            },
+          },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+        ])
+        .toArray();
+    } else {
+      services = await servicesCol
+        .find(query)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .toArray();
+    }
 
     const results = await Promise.all(
       services.map(async (service) => {
@@ -66,9 +88,10 @@ export async function GET(req: Request) {
             ? {
                 name: provider.Name,
                 slug: provider.Key,
-                isVerified: provider.IsVerified
+                isVerified: provider.IsVerified,
               }
-            : null
+            : null,
+          distance: (service as any).distance,
         };
       })
     );

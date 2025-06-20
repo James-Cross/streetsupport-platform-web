@@ -33,6 +33,23 @@ jest.mock('@/utils/mongodb', () => ({
                   }),
                 }),
               }),
+              aggregate: () => ({
+                toArray: async () => [
+                  {
+                    Key: 'service-1',
+                    ServiceProviderKey: 'org-1',
+                    Title: 'Test Service',
+                    ParentCategoryKey: 'health',
+                    SubCategoryKey: 'gp',
+                    Description: 'Test description',
+                    OpeningTimes: [],
+                    ClientGroups: [],
+                    Address: { City: 'Leeds', Location: { coordinates: [-1,1] } },
+                    IsPublished: true,
+                    distance: 1.2,
+                  },
+                ],
+              }),
             };
           }
 
@@ -87,5 +104,15 @@ describe('GET /api/services', () => {
     expect(json.results[0].organisation.name).toBe('Test Org');
     expect(json.results[0].organisation.slug).toBe('org-1');
     expect(json.results[0].organisation.isVerified).toBe(true);
+  });
+
+  it('supports lat/lng search with distance', async () => {
+    const req = new Request('http://localhost/api/services?lat=53&lng=-1');
+    const res = await GET(req);
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.status).toBe('success');
+    expect(Array.isArray(json.results)).toBe(true);
+    expect(json.results[0].distance).toBeDefined();
   });
 });
